@@ -1,0 +1,5 @@
+{
+  "name": "Personality De-duplicator",
+  "description": "Upload an Excel file with 'Original' and 'Duplicates' columns. This app uses Gemini with Google Search to determine if the names in each row refer to the same person and presents the analysis in a clear table.",
+  "requestFramePermissions": []
+}
