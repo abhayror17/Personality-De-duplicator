@@ -29,3 +29,9 @@ export const GoogleIcon: React.FC<{ className?: string }> = ({ className }) => (
     <path d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,5 12,5C14.6,5 16.14,6.35 16.83,7.06L18.84,5.2C17.02,3.6 14.71,2.5 12,2.5C6.48,2.5 2,7.44 2,12.82C2,18.2 6.48,23.14 12,23.14C17.52,23.14 21.6,19.18 21.6,13.25C21.6,12.36 21.5,11.73 21.35,11.1Z" fill="#4285F4"/>
   </svg>
 );
+
+export const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+  </svg>
+);

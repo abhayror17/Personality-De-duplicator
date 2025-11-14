@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import FileUpload from './components/FileUpload';
 import ResultsTable from './components/ResultsTable';
 import Spinner from './components/Spinner';
-import { GoogleIcon, SparklesIcon } from './components/Icons';
+import { GoogleIcon, SparklesIcon, DownloadIcon } from './components/Icons';
 import { parseExcelFile } from './utils/excelParser';
 import { analyzeRow } from './services/geminiService';
 import type { ExcelRow, AnalysisResult } from './types';
@@ -43,32 +43,38 @@ const App: React.FC = () => {
         return;
       }
       setTotal(data.length);
+      
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY = 1000;
 
       for (let i = 0; i < data.length; i++) {
         const row = data[i];
-        try {
-          const analysis = await analyzeRow(row);
-          const result: AnalysisResult = {
-            ...row,
-            id: i,
-            status: analysis.status,
-            sources: analysis.sources,
-          };
-          setResults(prev => [...prev, result].sort((a, b) => a.id - b.id));
-        } catch (e) {
-            console.error(`Error analyzing row ${i + 1}:`, e);
-            const errorResult: AnalysisResult = {
-                ...row,
-                id: i,
-                status: 'ERROR',
-                sources: [],
-            };
-            setResults(prev => [...prev, errorResult].sort((a, b) => a.id - b.id));
-        } finally {
-            setProgress(p => p + 1);
-            // Add a small delay between API calls to avoid rate limiting
-            await sleep(250);
+        let finalResult: AnalysisResult | null = null;
+        
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          try {
+            if (attempt > 0) {
+              await sleep(RETRY_DELAY * attempt);
+            }
+            const analysis = await analyzeRow(row);
+            if (analysis.status !== 'ERROR') {
+              finalResult = { ...row, id: i, ...analysis };
+              break; // Success, exit retry loop
+            }
+            console.warn(`Attempt ${attempt + 1} for row ${i + 1} was recoverable. Retrying...`);
+          } catch (e) {
+            console.error(`Attempt ${attempt + 1} for row ${i + 1} failed with exception:`, e);
+          }
         }
+      
+        if (!finalResult) {
+          finalResult = { ...row, id: i, status: 'ERROR', sources: [] };
+        }
+      
+        setResults(prev => [...prev, finalResult!].sort((a, b) => a.id - b.id));
+        setProgress(p => p + 1);
+        // Add a small delay between API calls to avoid rate limiting
+        await sleep(250);
       }
 
     } catch (e) {
@@ -78,6 +84,33 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const handleExport = useCallback(() => {
+    if (results.length === 0) return;
+
+    const headers = ['Original', 'Duplicates', 'Analysis'];
+    const rows = results.map(res => [
+        `"${res.Original.replace(/"/g, '""')}"`, // Handle quotes
+        `"${res.Duplicates.replace(/"/g, '""')}"`,
+        res.status
+    ]);
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'analysis_results.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [results]);
   
   const WelcomeState = () => (
       <div className="text-center py-8">
@@ -155,7 +188,20 @@ const App: React.FC = () => {
                 </div>
             )}
             
-            {results.length > 0 && <ResultsTable results={results} />}
+            {results.length > 0 && !isLoading && (
+              <div className="mt-8">
+                <div className="text-right mb-4">
+                    <button
+                        onClick={handleExport}
+                        className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                        <DownloadIcon className="-ml-1 mr-2 h-5 w-5" />
+                        Export as CSV
+                    </button>
+                </div>
+                <ResultsTable results={results} />
+              </div>
+            )}
             {!isLoading && results.length === 0 && file === null && <WelcomeState />}
           </div>
         </main>
