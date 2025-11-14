@@ -44,36 +44,40 @@ const App: React.FC = () => {
       }
       setTotal(data.length);
       
-      const MAX_RETRIES = 3;
       const RETRY_DELAY = 1000;
 
       for (let i = 0; i < data.length; i++) {
         const row = data[i];
-        let finalResult: AnalysisResult | null = null;
+        let attempt = 0;
         
-        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        // Loop indefinitely for the current row until a valid result is obtained
+        while (true) {
           try {
-            if (attempt > 0) {
-              await sleep(RETRY_DELAY * attempt);
+            attempt++;
+            if (attempt > 1) {
+              console.log(`Retrying row ${i + 1}, attempt ${attempt}...`);
+              await sleep(RETRY_DELAY * (attempt > 3 ? 3 : attempt)); // Cap delay
             }
+            
             const analysis = await analyzeRow(row);
-            if (analysis.status !== 'ERROR') {
-              finalResult = { ...row, id: i, ...analysis };
-              break; // Success, exit retry loop
+            
+            // Only proceed if we get a definitive answer
+            if (analysis.status === 'SAME' || analysis.status === 'DIFFERENT') {
+              const finalResult: AnalysisResult = { ...row, id: i, ...analysis };
+              setResults(prev => [...prev, finalResult].sort((a, b) => a.id - b.id));
+              setProgress(p => p + 1);
+              break; // Exit while loop and move to the next row
             }
-            console.warn(`Attempt ${attempt + 1} for row ${i + 1} was recoverable. Retrying...`);
+            
+            // If status is 'ERROR', log it and the while loop will continue, retrying
+            console.warn(`Analysis for row ${i + 1} returned status '${analysis.status}'. Retrying...`);
+
           } catch (e) {
-            console.error(`Attempt ${attempt + 1} for row ${i + 1} failed with exception:`, e);
+             console.error(`An exception occurred while analyzing row ${i + 1}, attempt ${attempt}:`, e);
           }
         }
-      
-        if (!finalResult) {
-          finalResult = { ...row, id: i, status: 'ERROR', sources: [] };
-        }
-      
-        setResults(prev => [...prev, finalResult!].sort((a, b) => a.id - b.id));
-        setProgress(p => p + 1);
-        // Add a small delay between API calls to avoid rate limiting
+        
+        // Add a small delay between successful row analyses to avoid rate limiting
         await sleep(250);
       }
 
