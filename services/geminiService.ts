@@ -36,13 +36,14 @@ export const analyzeRow = async (row: ExcelRow): Promise<AnalysisResponse> => {
         }))
         .filter((source: any) => source.uri) ?? [];
 
+    const upperCaseText = text.toUpperCase();
 
-    if (text === "SAME") {
+    if (upperCaseText.includes("SAME")) {
       return {
         status: 'SAME',
         sources: sources,
       };
-    } else if (text === "DIFFERENT") {
+    } else if (upperCaseText.includes("DIFFERENT")) {
       return {
         status: 'DIFFERENT',
         sources: sources,
